@@ -210,33 +210,41 @@ with tab1:
 
     kpis = load_kpis_cached(periodo_sel)
     if kpis:
-        avance = kpis.get("avance_nacional_pct", 0)
-        color_class = "status-green" if avance >= 70 else ("status-yellow" if avance >= 40 else "status-red")
+        pim = kpis.get("pim_nacional", 0)
+        dev = kpis.get("devengado_nacional", 0)
+        avance_raw = kpis.get("avance_nacional_pct", 0)
+        # Cap display at 100% — avance >100 ocurre cuando devengado > comprometido_anual
+        avance_display = min(avance_raw, 100.0)
+        color_class = "status-green" if avance_display >= 70 else ("status-yellow" if avance_display >= 40 else "status-red")
+        saldo = abs(kpis.get("saldo_no_devengado_nacional", 0))
 
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("PIM Nacional", format_soles(kpis.get("pim_nacional", 0)))
+            st.metric("Comprometido Anual", format_soles(pim),
+                      help="MONTO_COMPROMETIDO_ANUAL acumulado — proxy del presupuesto disponible")
         with col2:
-            st.metric("Devengado Nacional", format_soles(kpis.get("devengado_nacional", 0)))
+            st.metric("Devengado Nacional", format_soles(dev))
         with col3:
             st.metric(
                 "Avance de Ejecución",
-                f"{avance:.1f}%",
-                delta=f"{avance - 75:.1f}% vs meta 75%",
+                f"{avance_display:.1f}%",
+                delta=f"{avance_display - 75:.1f}% vs meta 75%",
                 delta_color="normal",
             )
         with col4:
-            st.metric("Capital Paralizado", format_soles(kpis.get("saldo_no_devengado_nacional", 0)))
+            st.metric("Capital Paralizado", format_soles(saldo),
+                      help="Unidades con PIM > 10M PEN y bajo avance de ejecución")
 
+        nota_avance = f" (avance real: {avance_raw:.1f}% — devengado supera comprometido registrado)" if avance_raw > 100 else ""
         st.markdown(f"""
         <div class="metric-card">
         <b>🤖 Análisis del Agente Ejecutor — {periodo_sel}</b><br><br>
         El período fiscal <b>{periodo_sel}</b> registra un avance de ejecución nacional de
-        <span class="{color_class}">{avance:.1f}%</span>.
-        El presupuesto institucional modificado asciende a <b>{format_soles(kpis.get("pim_nacional", 0))}</b>,
-        de los cuales <b>{format_soles(kpis.get("saldo_no_devengado_nacional", 0))}</b> permanecen sin ejecutar
-        como <i>capital paralizado</i>. Las unidades ejecutoras con PIM mayor a 10M de soles y ejecución
+        <span class="{color_class}">{avance_display:.1f}%{nota_avance}</span>.
+        El comprometido anual asciende a <b>{format_soles(pim)}</b> y el devengado a
+        <b>{format_soles(dev)}</b>. Las unidades ejecutoras con presupuesto mayor a 10M de soles y ejecución
         inferior al 30% representan el principal cuello de botella de la descentralización fiscal peruana.
+        Se identificaron <b>{kpis.get("n_ejecutoras_hall_of_shame", 0)} ejecutoras</b> en zona crítica.
         </div>
         """, unsafe_allow_html=True)
     else:

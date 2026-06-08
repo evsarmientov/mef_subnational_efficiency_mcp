@@ -1,6 +1,8 @@
 """
 Local MCP Server — MEF Subnational Efficiency Pipeline
-Expone herramientas para consultar datosabiertos.gob.pe y procesar datos del MEF.
+Portal: datosabiertos.mef.gob.pe
+Backend API real: api.datosabiertos.mef.gob.pe/DatosAbiertos/v1 (descubierto del bundle Angular)
+Usa JSONP con ?callback=cb para evitar bloqueos CORS.
 """
 import json
 import logging
@@ -17,16 +19,61 @@ from mcp.types import TextContent, Tool
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://www.datosabiertos.gob.pe"
-CKAN_API = f"{BASE_URL}/api/3/action"
+# Portal MEF de Datos Abiertos
+MEF_PORTAL = "https://datosabiertos.mef.gob.pe"
+MEF_API = "https://api.datosabiertos.mef.gob.pe/DatosAbiertos/v1"
+
+# Resource IDs conocidos (2025)
+RESOURCE_2025_GASTO_MENSUAL = "77fc3228-fa6f-4c1f-a0ed-d32520ad11ad"
+
+# Columnas reales del dataset 2025-Gasto-Mensual.csv (verificadas contra la API)
+COLS_2025 = {
+    "pim": "MONTO_PIM",
+    "devengado": "MONTO_DEVENGADO",
+    "comprometido": "MONTO_COMPROMETIDO",
+    "region": "DEPARTAMENTO_EJECUTORA_NOMBRE",
+    "ejecutora": "EJECUTORA_NOMBRE",
+    "nivel_gobierno": "NIVEL_GOBIERNO_NOMBRE",
+    "nivel_gobierno_cod": "NIVEL_GOBIERNO",
+    "anio": "ANO_EJE",
+    "mes": "MES_EJE",
+    "funcion": "FUNCION_NOMBRE",
+    "sector": "SECTOR_NOMBRE",
+}
+
 DATA_DIR = Path(__file__).parent.parent / "data"
 
 app = Server("mef-subnational-mcp")
 
 
-def _get(url: str, params: dict | None = None, timeout: int = 30) -> dict:
-    with httpx.Client(timeout=timeout) as client:
+def _get(url: str, params: dict | None = None, timeout: int = 45) -> dict:
+    """GET genérico con verify=False (portal MEF tiene SSL issues)."""
+    with httpx.Client(timeout=timeout, verify=False) as client:
         resp = client.get(url, params=params)
+        resp.raise_for_status()
+        return resp.json()
+
+
+def _mef_datastore_search(resource_id: str, filters: dict | None = None,
+                          limit: int = 10, fields: str | None = None,
+                          offset: int = 0) -> dict:
+    """
+    Consulta el backend real del MEF con parámetro callback=cb (JSONP workaround).
+    Retorna el JSON ya parseado.
+    """
+    params: dict = {
+        "resource_id": resource_id,
+        "limit": limit,
+        "offset": offset,
+        "callback": "cb",
+    }
+    if filters:
+        params["filters"] = json.dumps(filters)
+    if fields:
+        params["fields"] = fields
+
+    with httpx.Client(timeout=60, verify=False) as client:
+        resp = client.get(f"{MEF_API}/datastore_search", params=params)
         resp.raise_for_status()
         return resp.json()
 
@@ -217,34 +264,33 @@ async def _dispatch(name: str, args: dict) -> Any:
 # ── Implementaciones ──────────────────────────────────────────────────────────
 
 def _buscar_datasets(query: str, rows: int) -> dict:
-    data = _get(f"{CKAN_API}/package_search", {"q": query, "rows": rows})
-    results = data.get("result", {}).get("results", [])
-    return [
+    # El portal MEF es una SPA Angular — retornamos los datasets conocidos directamente
+    datasets_conocidos = [
         {
-            "id": r["id"],
-            "name": r["name"],
-            "title": r.get("title", ""),
-            "num_resources": len(r.get("resources", [])),
-            "last_modified": r.get("metadata_modified", ""),
-        }
-        for r in results
+            "id": RESOURCE_2025_GASTO_MENSUAL,
+            "name": "presupuesto-y-ejecucion-de-gasto",
+            "title": "Presupuesto y Ejecución de Gasto — 2025-Gasto-Mensual.csv",
+            "descripcion": "11.4M registros de ejecución presupuestal 2025 por ejecutora/departamento",
+            "columnas_clave": COLS_2025,
+            "portal": MEF_PORTAL,
+        },
     ]
+    return {"query": query, "total": len(datasets_conocidos), "results": datasets_conocidos}
 
 
 def _obtener_detalle_dataset(dataset_id: str) -> dict:
-    data = _get(f"{CKAN_API}/package_show", {"id": dataset_id})
-    pkg = data.get("result", {})
-    resources = [
-        {
-            "id": r["id"],
-            "name": r.get("name", ""),
-            "format": r.get("format", ""),
-            "url": r.get("url", ""),
-            "last_modified": r.get("last_modified", ""),
-        }
-        for r in pkg.get("resources", [])
-    ]
-    return {"title": pkg.get("title", ""), "resources": resources}
+    # Retorna el esquema y muestra usando el backend real MEF
+    data = _mef_datastore_search(dataset_id, limit=5)
+    records = data.get("records", [])
+    fields = list(records[0].keys()) if records else []
+    return {
+        "resource_id": dataset_id,
+        "title": "2025-Gasto-Mensual.csv — Presupuesto y Ejecución de Gasto",
+        "total_registros": data.get("include_total", "desconocido"),
+        "columnas": fields,
+        "muestra": records[:3],
+        "columnas_clave": COLS_2025,
+    }
 
 
 def _descargar_documento_1964(url: str) -> dict:
@@ -262,51 +308,58 @@ def _descargar_documento_1964(url: str) -> dict:
 
 
 def _listar_entidades_publicas(tipo: str) -> dict:
-    query_map = {"regional": "gobierno regional", "municipal": "municipalidad", "ministerio": "ministerio"}
-    query = query_map.get(tipo, tipo)
-    data = _get(f"{CKAN_API}/organization_list", {"all_fields": True, "q": query, "limit": 50})
-    orgs = data.get("result", [])
-    return {"tipo": tipo, "total": len(orgs), "entidades": [{"name": o.get("name"), "title": o.get("title")} for o in orgs]}
+    # Usa el backend real MEF para obtener ejecutoras del tipo solicitado
+    nivel_map = {"regional": "R", "municipal": "M", "ministerio": "E"}
+    nivel_cod = nivel_map.get(tipo, "R")
+    data = _mef_datastore_search(
+        RESOURCE_2025_GASTO_MENSUAL,
+        filters={"NIVEL_GOBIERNO": nivel_cod},
+        fields="EJECUTORA_NOMBRE,DEPARTAMENTO_EJECUTORA_NOMBRE,SECTOR_NOMBRE",
+        limit=200,
+    )
+    records = data.get("records", [])
+    entidades = list({r["EJECUTORA_NOMBRE"]: r for r in records if r.get("EJECUTORA_NOMBRE")}.values())
+    return {"tipo": tipo, "nivel_cod": nivel_cod, "total": len(entidades), "entidades": entidades[:50]}
 
 
-def _inspeccionar_esquema_csv(url: str, filas: int) -> dict:
-    import io
+def _inspeccionar_esquema_csv(url_o_resource_id: str, filas: int) -> dict:
+    """
+    Toma una muestra mínima del dataset MEF sin descargar el archivo completo.
+    Acepta una URL o un resource_id del MEF.
+    """
+    resource_id = RESOURCE_2025_GASTO_MENSUAL
+    if len(url_o_resource_id) == 36 and "-" in url_o_resource_id:
+        resource_id = url_o_resource_id
+
+    data = _mef_datastore_search(resource_id, limit=filas)
+    records = data.get("records", [])
+    if not records:
+        return {"error": "Sin registros", "resource_id": resource_id}
+
     import pandas as pd
+    df = pd.DataFrame(records)
 
-    with httpx.Client(timeout=60, follow_redirects=True) as client:
-        # Solo descargamos los primeros bytes (~50KB) para evitar cargar el archivo completo
-        headers = {"Range": "bytes=0-51200"}
-        resp = client.get(url, headers=headers)
-
-    try:
-        df = pd.read_csv(io.StringIO(resp.text), nrows=filas, encoding="utf-8", on_bad_lines="skip")
-    except Exception:
-        df = pd.read_csv(io.StringIO(resp.text), nrows=filas, encoding="latin-1", on_bad_lines="skip")
-
-    snapshot_path = DATA_DIR / "snapshots" / f"snapshot_{url.split('/')[-1][:40]}.json"
     snapshot = {
-        "url": url,
+        "resource_id": resource_id,
         "columnas": list(df.columns),
         "tipos": {c: str(df[c].dtype) for c in df.columns},
         "muestra": df.head(filas).to_dict(orient="records"),
+        "columnas_clave_mapeadas": COLS_2025,
     }
-    snapshot_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+    snap_path = DATA_DIR / "snapshots" / f"snapshot_mef_2025.json"
+    snap_path.parent.mkdir(parents=True, exist_ok=True)
+    snap_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
     return snapshot
 
 
 def _consultar_datastore_filtrado(resource_id: str, filters: dict, limit: int, sql: str | None) -> dict:
-    if sql:
-        data = _get(f"{CKAN_API}/datastore_search_sql", {"sql": sql})
-    else:
-        params = {"resource_id": resource_id, "limit": limit}
-        if filters:
-            params["filters"] = json.dumps(filters)
-        data = _get(f"{CKAN_API}/datastore_search", params)
-    result = data.get("result", {})
+    # Usa el backend real MEF
+    resource_id = resource_id or RESOURCE_2025_GASTO_MENSUAL
+    data = _mef_datastore_search(resource_id, filters=filters or None, limit=limit)
+    records = data.get("records", [])
     return {
-        "total": result.get("total", 0),
-        "fields": result.get("fields", []),
-        "records": result.get("records", [])[:limit],
+        "total": data.get("include_total", len(records)),
+        "records": records[:limit],
     }
 
 

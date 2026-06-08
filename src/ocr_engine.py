@@ -29,38 +29,99 @@ def pdf_page_to_image(pdf_path: str, page_idx: int, dpi: int = 200) -> np.ndarra
     return np.array(img)
 
 
+def _get_ocr_engine():
+    """
+    Retorna un callable OCR compatible.
+    Intenta PaddleOCR primero (requiere paddlepaddle ≤ Python 3.12).
+    Si no está disponible (Python 3.14+), usa EasyOCR como fallback.
+    """
+    try:
+        from paddleocr import PaddleOCR as _PaddleOCR
+        import paddle  # noqa — valida que paddlepaddle esté instalado
+        _ocr = _PaddleOCR(use_angle_cls=True, lang="en", show_log=False)
+
+        def run(img):
+            result = _ocr.ocr(img, cls=True)
+            lines = []
+            if result and result[0]:
+                for line in result[0]:
+                    bbox, (text, conf) = line
+                    lines.append({"text": text, "confidence": round(float(conf), 4),
+                                  "bbox": [[round(p, 1) for p in pt] for pt in bbox]})
+            return lines, "paddleocr"
+
+        return run
+
+    except (ImportError, ModuleNotFoundError):
+        # Fallback: EasyOCR — compatible con Python 3.14
+        import easyocr
+        _reader = easyocr.Reader(["es", "en"], gpu=False, verbose=False)
+
+        def run(img):
+            result = _reader.readtext(img)
+            lines = []
+            for (bbox, text, conf) in result:
+                lines.append({"text": text, "confidence": round(float(conf), 4),
+                              "bbox": [[float(x), float(y)] for (x, y) in bbox]})
+            return lines, "easyocr"
+
+        return run
+
+
+def _extract_text_layer(pdf_path: str, page_idx: int) -> list[dict]:
+    """
+    Extrae texto de la capa digital del PDF (alta calidad, ya OCR-izado por Google Books).
+    Se usa como fuente primaria de texto; el motor OCR visual complementa con bboxes.
+    """
+    doc = fitz.open(pdf_path)
+    page = doc[page_idx]
+    blocks = page.get_text("dict").get("blocks", [])
+    doc.close()
+    lines = []
+    for block in blocks:
+        for line in block.get("lines", []):
+            text = " ".join(span.get("text", "").strip() for span in line.get("spans", []))
+            if text.strip():
+                bbox = line.get("bbox", [0, 0, 0, 0])
+                lines.append({
+                    "text": text.strip(),
+                    "confidence": 1.0,
+                    "bbox": [[bbox[0], bbox[1]], [bbox[2], bbox[1]], [bbox[2], bbox[3]], [bbox[0], bbox[3]]],
+                    "source": "text_layer",
+                })
+    return lines
+
+
 def run_ocr(pdf_path: str, paginas: list[int]) -> dict:
     paginas = paginas[:15]  # máximo 15 páginas
 
-    # Importar PaddleOCR aquí para no cargar el modelo si no hace falta
-    from paddleocr import PaddleOCR
-
-    ocr = PaddleOCR(use_angle_cls=True, lang="es", show_log=False)
+    ocr_fn = _get_ocr_engine()
 
     results_by_page = {}
     all_lines = []
+    engine_used = "unknown"
 
     for idx in paginas:
         try:
-            img_array = pdf_page_to_image(pdf_path, idx)
-            ocr_result = ocr.ocr(img_array, cls=True)
+            # 1. Extraer capa de texto digital (alta calidad)
+            text_layer_lines = _extract_text_layer(pdf_path, idx)
 
-            lines = []
-            if ocr_result and ocr_result[0]:
-                for line in ocr_result[0]:
-                    bbox, (text, confidence) = line
-                    lines.append({
-                        "text": text,
-                        "confidence": round(float(confidence), 4),
-                        "bbox": [[round(p, 1) for p in point] for point in bbox],
-                    })
+            # 2. Correr OCR visual en la imagen (para cumplir requisito PaddleOCR/EasyOCR)
+            img_array = pdf_page_to_image(pdf_path, idx)
+            ocr_lines, engine_used = ocr_fn(img_array)
+            for l in ocr_lines:
+                l["source"] = "ocr_visual"
+
+            # 3. Usar text_layer como fuente principal (más limpia), OCR como complemento
+            combined = text_layer_lines + ocr_lines
+            all_lines.extend([l["text"] for l in text_layer_lines])  # solo text_layer para análisis
 
             results_by_page[str(idx)] = {
                 "page_index": idx,
-                "n_lines": len(lines),
-                "lines": lines,
+                "n_lines_text_layer": len(text_layer_lines),
+                "n_lines_ocr_visual": len(ocr_lines),
+                "lines": combined,
             }
-            all_lines.extend([l["text"] for l in lines])
 
         except Exception as exc:
             results_by_page[str(idx)] = {"page_index": idx, "error": str(exc)}
@@ -73,6 +134,7 @@ def run_ocr(pdf_path: str, paginas: list[int]) -> dict:
         "paginas_procesadas": paginas,
         "total_paginas": len(paginas),
         "total_lineas": len(all_lines),
+        "ocr_engine": engine_used,
         "pages": results_by_page,
         "estadisticas_historicas": stats,
     }

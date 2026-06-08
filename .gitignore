@@ -1,0 +1,17 @@
+# Datos crudos grandes (no subir a Git)
+data/raw_pdfs/*.csv
+data/raw_pdfs/*.parquet
+data/raw_pdfs/hacienda_1964.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+.env
+*.egg-info/
+
+# Streamlit
+.streamlit/
+
+# IDEs
+.vscode/
+.idea/
