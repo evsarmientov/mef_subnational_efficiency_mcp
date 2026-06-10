@@ -12,6 +12,7 @@ Uso:
 import argparse
 import json
 import sys
+import time
 import warnings
 from pathlib import Path
 
@@ -30,23 +31,31 @@ SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 MIN_PIM_SOLES = 10_000_000
 
 
-def _periodo_to_filter(periodo: str) -> str:
-    """Devuelve cláusula WHERE para filtrar por período."""
+def _periodo_to_filter(periodo: str) -> tuple[str, list[int]]:
+    """
+    Devuelve (cláusula WHERE, lista de meses incluidos).
+    El filtro es ACUMULADO: si el período es 2025-09 incluye meses 1..9 (enero–sept).
+    Si es trimestral 2025-Q3 incluye meses 1..9 también.
+    """
     if "-Q" in periodo:
         q = int(periodo.split("-Q")[1])
-        m_start, m_end = (q - 1) * 3 + 1, q * 3
-        return f"CAST(MES_EJE AS INTEGER) BETWEEN {m_start} AND {m_end}"
+        m_end = q * 3
+        meses = list(range(1, m_end + 1))
+        return f"CAST(MES_EJE AS INTEGER) <= {m_end}", meses
     if "-" in periodo:
         mes = int(periodo.split("-")[1])
-        return f"CAST(MES_EJE AS INTEGER) = {mes}"
-    return "1=1"  # año completo
+        meses = list(range(1, mes + 1))
+        return f"CAST(MES_EJE AS INTEGER) <= {mes}", meses
+    return "1=1", list(range(1, 13))  # año completo
 
 
 def run_pipeline(periodo: str) -> dict:
+    t_start = time.time()
+
     if not RAW_CSV.exists():
         return {"error": f"CSV no encontrado: {RAW_CSV}. Descárgalo de datosabiertos.mef.gob.pe"}
 
-    where = _periodo_to_filter(periodo)
+    where, meses = _periodo_to_filter(periodo)
     csv_path = str(RAW_CSV).replace("\\", "/")
 
     # DuckDB procesa el CSV directamente en disco — cero pandas en memoria
@@ -139,16 +148,21 @@ def run_pipeline(periodo: str) -> dict:
 
     df_region.to_parquet(out_region, index=False)
     df_shame.to_parquet(out_shame, index=False)
+    t_total = round(time.time() - t_start, 1)
+    print(f"Pipeline completado en {t_total}s", file=sys.stderr)
+
     out_kpis.write_text(
         json.dumps({
             "periodo": periodo,
+            "meses_acumulados": meses,
             "pim_nacional": pim_nac,
             "devengado_nacional": dev_nac,
             "avance_nacional_pct": avance_nac,
             "saldo_no_devengado_nacional": round(pim_nac - dev_nac, 0),
             "n_regiones": len(df_region),
             "n_ejecutoras_hall_of_shame": len(df_shame),
-            "nota": "PIM = MONTO_COMPROMETIDO_ANUAL (del CSV 2025-Gasto-Mensual del MEF)",
+            "tiempo_ejecucion_seg": t_total,
+            "nota": "Acumulado enero–mes indicado. PIM = MONTO_COMPROMETIDO_ANUAL del CSV MEF.",
         }, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -158,6 +172,7 @@ def run_pipeline(periodo: str) -> dict:
         "pim_nacional": pim_nac,
         "devengado_nacional": dev_nac,
         "avance_nacional_pct": avance_nac,
+        "tiempo_ejecucion_seg": t_total,
         "n_registros_procesados": int(df_region["n_registros"].sum()),
         "archivos_generados": {
             "regiones": str(out_region),

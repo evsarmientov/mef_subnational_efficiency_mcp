@@ -1,10 +1,22 @@
 {
   "periodo": "2025-09",
-  "pim_nacional": 12314558680.320011,
-  "devengado_nacional": 21162887768.590073,
-  "avance_nacional_pct": 171.85,
-  "saldo_no_devengado_nacional": -8848329088.0,
+  "meses_acumulados": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "pim_nacional": 221312147216.2701,
+  "devengado_nacional": 179872947409.66953,
+  "avance_nacional_pct": 81.28,
+  "saldo_no_devengado_nacional": 41439199807.0,
   "n_regiones": 25,
-  "n_ejecutoras_hall_of_shame": 172,
-  "nota": "PIM = MONTO_COMPROMETIDO_ANUAL (del CSV 2025-Gasto-Mensual del MEF)"
+  "n_ejecutoras_hall_of_shame": 300,
+  "tiempo_ejecucion_seg": 45.3,
+  "nota": "Acumulado enero–mes indicado. PIM = MONTO_COMPROMETIDO_ANUAL del CSV MEF."
 }

@@ -1,7 +1,7 @@
 {
   "name": "executor_skill",
-  "description": "Data Engineering & Production Engine — Descarga, procesa y visualiza datos presupuestales MEF 2025 y el archivo histórico 1964. Actúa como el agente trabajador principal del pipeline.",
-  "version": "1.0.0",
+  "description": "Data Engineering & Production Engine — procesa el CSV local MEF 2025 con DuckDB y el PDF histórico 1964 con PaddleOCR/EasyOCR.",
+  "version": "1.1.0",
   "trigger_patterns": [
     "run executor_skill",
     "execute mef_update",
@@ -11,7 +11,7 @@
   "parameters": {
     "periodo": {
       "type": "string",
-      "description": "Período de análisis. Formato: 'YYYY-MM' (ej: 2025-12) o 'YYYY-QN' (ej: 2025-Q4)",
+      "description": "Período acumulado. Formato: 'YYYY-MM' (ej: 2025-09 = enero–sept) o 'YYYY-QN' (ej: 2025-Q3 = enero–sept)",
       "required": true
     },
     "run_ocr": {
@@ -23,22 +23,20 @@
       "type": "array",
       "items": { "type": "integer" },
       "description": "Índices de páginas del PDF 1964 a procesar (máximo 15, base 0)",
-      "default": [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14]
+      "default": [43,44,45,47,48,55,56,57,58,59,60,61,62,63,64]
     }
   },
-  "prompt_template": "Eres el Executor Agent del pipeline MEF Subnational Efficiency. Tu misión es procesar datos presupuestales peruanos de forma eficiente.\n\n## PERÍODO SOLICITADO: {{periodo}}\n\n## REGLAS CRÍTICAS (no negociables):\n1. NUNCA cargues CSVs completos en el contexto. Usa siempre la herramienta `inspeccionar_esquema_csv` primero para mapear columnas, luego `descargar_y_analizar_estadisticas` para correr el pipeline local.\n2. Todos los datos procesados deben guardarse en `data/processed/` como archivos Parquet o JSON pequeños.\n3. El pipeline debe ser invocable con cualquier período — no hardcodees fechas.\n\n## PASOS DE EJECUCIÓN:\n\n### PASO 1 — Búsqueda del dataset 2025\nUsa `buscar_datasets` con query 'ejecucion presupuestal SIAF 2025' o 'presupuesto institucional modificado 2025'.\nLuego usa `obtener_detalle_dataset` con el ID más relevante para obtener la URL de descarga del CSV.\n\n### PASO 2 — Snapshot y validación de esquema\nUsa `inspeccionar_esquema_csv` sobre la URL encontrada. Identifica las columnas reales para: PIM, Devengado, Departamento/Región, Entidad/Ejecutora. Guarda el snapshot en `data/snapshots/`.\n\n### PASO 3 — Pipeline de datos\nLlama a `descargar_y_analizar_estadisticas` con los parámetros correctos (url, periodo={{periodo}}, columnas identificadas en el paso anterior). Esto ejecuta `src/data_pipeline.py` localmente y genera:\n- `data/processed/region_{{periodo}}.parquet`\n- `data/processed/shame_{{periodo}}.parquet`\n- `data/processed/kpis_{{periodo}}.json`\n\n### PASO 4 — OCR 1964 (solo si run_ocr=true o si no existe `data/processed/ocr_1964_results.json`)\nVerifica si existe `data/raw_pdfs/hacienda_1964.pdf`. Si no existe, usa `descargar_documento_1964` con la URL del portal fuenteshistoricasdelperu.com.\nLuego usa `procesar_ocr_paginas_1964` con paginas={{paginas_ocr}} (máximo 15 páginas).\n\n### PASO 5 — Verificación\nConfirma que los siguientes archivos existen y tienen contenido:\n- `data/processed/region_{{periodo}}.parquet`\n- `data/processed/shame_{{periodo}}.parquet`\n- `data/processed/kpis_{{periodo}}.json`\n- `data/processed/ocr_1964_results.json` (si se ejecutó OCR)\n\nReporta un resumen en formato JSON con:\n- KPIs nacionales (PIM, Devengado, Avance %)\n- Top 5 regiones con menor avance\n- Top 5 peores ejecutoras (>10M PEN)\n- Estado del OCR histórico\n- Tiempo total de ejecución\n\n## OUTPUT ESPERADO:\nUn JSON estructurado con el resumen de ejecución y rutas de archivos generados, listo para ser validado por el Evaluator Agent.",
-  "mcp_tools_required": [
-    "buscar_datasets",
-    "obtener_detalle_dataset",
-    "inspeccionar_esquema_csv",
-    "descargar_y_analizar_estadisticas",
-    "descargar_documento_1964",
-    "procesar_ocr_paginas_1964"
-  ],
+  "prompt_template": "Eres el Executor Agent del pipeline MEF Subnational Efficiency.\n\n## PERÍODO SOLICITADO: {{periodo}}\nEste período es ACUMULADO: si se pide 2025-09, se procesan los meses 1 a 9 (enero–septiembre).\n\n## REGLAS CRÍTICAS:\n1. NUNCA cargues el CSV completo en el contexto del LLM. DuckDB lo procesa en disco.\n2. El CSV local está en data/raw_pdfs/2025-Gasto-Mensual.csv\n3. Todos los outputs van a data/processed/\n\n## PASOS:\n\n### PASO 1 — Ejecutar el pipeline de datos\nEjecuta el script local:\n```\npython src/data_pipeline.py --periodo {{periodo}}\n```\nEsto genera:\n- data/processed/region_{{periodo}}.parquet\n- data/processed/shame_{{periodo}}.parquet\n- data/processed/kpis_{{periodo}}.json\n\n### PASO 2 — OCR histórico 1964 (solo si run_ocr=true o si no existe ocr_1964_results.json)\nEjecuta:\n```\npython src/ocr_engine.py data/raw_pdfs/hacienda_1964.pdf --paginas 43,44,45,47,48,55,56,57,58,59,60,61,62,63,64\n```\nMáximo 15 páginas — limitación del docente para evitar demoras.\n\n### PASO 3 — Ejecutar el Evaluator\n```\npython src/evaluator.py --periodo {{periodo}}\n```\nEsto genera data/processed/evaluator_report.md y actualiza audit_log.json.\n\n### PASO 4 — Verificar outputs\nConfirma que existen:\n- data/processed/region_{{periodo}}.parquet\n- data/processed/shame_{{periodo}}.parquet\n- data/processed/kpis_{{periodo}}.json\n- data/processed/evaluator_report.md\n- data/processed/audit_log.json\n\nReporta un JSON con KPIs nacionales, top 5 regiones, peores 5 ejecutoras y tiempo de ejecución.",
+  "local_scripts": {
+    "pipeline": "python src/data_pipeline.py --periodo {periodo}",
+    "ocr": "python src/ocr_engine.py data/raw_pdfs/hacienda_1964.pdf --paginas 43,44,45,47,48,55,56,57,58,59,60,61,62,63,64",
+    "evaluator": "python src/evaluator.py --periodo {periodo}"
+  },
   "output_files": [
     "data/processed/region_{periodo}.parquet",
     "data/processed/shame_{periodo}.parquet",
     "data/processed/kpis_{periodo}.json",
-    "data/processed/ocr_1964_results.json"
+    "data/processed/evaluator_report.md",
+    "data/processed/audit_log.json"
   ]
 }

@@ -340,8 +340,8 @@ with tab2:
         st.plotly_chart(build_frozen_capital_bar(df_region), use_container_width=True)
 
         with st.expander("Tabla completa por región"):
-            show_df = df_region[["region", "pim_total", "devengado_total", "avance_pct", "saldo_no_devengado", "n_entidades"]].copy()
-            show_df.columns = ["Región", "PIM Total", "Devengado", "Avance %", "Saldo No Devengado", "N° Entidades"]
+            show_df = df_region[["region", "pim_total", "devengado_total", "avance_pct", "saldo_no_devengado", "n_registros"]].copy()
+            show_df.columns = ["Región", "PIM Total", "Devengado", "Avance %", "Saldo No Devengado", "N° Registros"]
             for col in ["PIM Total", "Devengado", "Saldo No Devengado"]:
                 show_df[col] = show_df[col].apply(format_soles)
             st.dataframe(show_df, use_container_width=True, hide_index=True)
@@ -414,47 +414,86 @@ with tab4:
     st.header("🤖 Log de Auditoría Multi-Agente")
     st.caption("Registro de ejecuciones del Executor Skill y correcciones del Evaluator Skill")
 
-    # Reporte del Evaluator
+    # ── Benchmarks de rendimiento ─────────────────────────────────────────────
+    kpis_t4 = load_kpis_cached(periodo_sel)
+    if kpis_t4:
+        t_exec = kpis_t4.get("tiempo_ejecucion_seg")
+        meses_acc = kpis_t4.get("meses_acumulados", [])
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Tiempo pipeline", f"{t_exec}s" if t_exec else "N/A",
+                  help="Tiempo de ejecución de DuckDB sobre el CSV de 10+ GB")
+        c2.metric("Meses acumulados", len(meses_acc),
+                  help=f"Período acumulado: meses {meses_acc[0] if meses_acc else '?'}–{meses_acc[-1] if meses_acc else '?'}")
+        c3.metric("Registros procesados", f"{kpis_t4.get('n_regiones', 0)} regiones",
+                  help="Grupos por departamento generados por DuckDB")
+
+    st.divider()
+
+    # ── Reporte del Evaluator ─────────────────────────────────────────────────
     report_md = load_evaluator_report()
     if report_md:
         with st.expander("📋 Reporte del Evaluator Agent", expanded=True):
             st.markdown(report_md)
     else:
-        st.info("Sin reporte del Evaluator aún. Ejecuta: `claude \"run evaluator_skill for period 2025-12\"`")
+        st.info("Sin reporte del Evaluator aún. Ejecuta desde la CLI:")
+        st.code(f'python src/evaluator.py --periodo {periodo_sel}', language="bash")
 
     st.divider()
 
-    # Log de auditoría cronológico
+    # ── Log de auditoría cronológico ──────────────────────────────────────────
     st.subheader("📝 Historial de Ejecuciones")
     audit_log = load_audit_log_cached()
     if audit_log:
         for entry in reversed(audit_log[-20:]):
             ts = entry.get("timestamp", "")[:19].replace("T", " ")
-            action = entry.get("action", entry.get("type", "event"))
-            detail = entry.get("detail", entry.get("message", ""))
+            action = entry.get("action", "event")
+            periodo_entry = entry.get("periodo", "")
+            veredicto = entry.get("veredicto", "")
+            t_eval = entry.get("tiempo_evaluacion_seg", "")
+            errors = entry.get("errors", 0)
+            warns = entry.get("warnings", 0)
+            color = "#1a9850" if veredicto == "OK" else "#d73027"
+            detail_str = f"período {periodo_entry} | {veredicto} | {errors} errores, {warns} advertencias | {t_eval}s"
             st.markdown(
-                f'<div class="audit-entry"><b>{ts}</b> · <span style="color:#1565C0">{action}</span> · {detail}</div>',
+                f'<div class="audit-entry"><b>{ts}</b> · '
+                f'<span style="color:#1565C0">{action}</span> · '
+                f'<span style="color:{color}">{detail_str}</span></div>',
                 unsafe_allow_html=True,
             )
     else:
-        st.caption("Sin entradas en el log todavía.")
+        st.caption("Sin entradas en el log todavía. Ejecuta el Evaluator Skill para generar.")
 
     st.divider()
 
-    # Playground — Cambio de período en vivo
-    st.subheader("🎮 Playground — Actualización de Período")
-    st.markdown("Ingresa un período y copia el comando para ejecutarlo desde la CLI de Claude Code:")
+    # ── Playground — CLI en vivo ──────────────────────────────────────────────
+    st.subheader("🎮 Playground — Cambio de Período en Vivo")
+    st.markdown("Selecciona un período y ejecuta los comandos desde la CLI de Claude Code:")
 
-    play_periodo = st.text_input("Período a analizar:", value="2025-12", key="playground_periodo")
-    col_p1, col_p2 = st.columns(2)
+    play_periodo = st.text_input("Período a analizar (acumulado):", value="2025-09", key="playground_periodo",
+                                 help="2025-09 = enero–septiembre | 2025-Q3 = Q1+Q2+Q3 | 2025 = año completo")
+
+    col_p1, col_p2, col_p3 = st.columns(3)
     with col_p1:
-        st.code(f'claude "run executor_skill for period {play_periodo}"', language="bash")
+        st.markdown("**1. Pipeline de datos:**")
+        st.code(f'python src/data_pipeline.py --periodo {play_periodo}', language="bash")
     with col_p2:
-        st.code(f'claude "run evaluator_skill for period {play_periodo}"', language="bash")
+        st.markdown("**2. Auditoría:**")
+        st.code(f'python src/evaluator.py --periodo {play_periodo}', language="bash")
+    with col_p3:
+        st.markdown("**3. Via Claude Code CLI:**")
+        st.code(f'claude "run executor_skill for period {play_periodo}"', language="bash")
 
-    if st.button("🔄 Recargar datos actuales", type="primary"):
-        st.cache_data.clear()
-        st.rerun()
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        if st.button("🔄 Recargar dashboard", type="primary"):
+            st.cache_data.clear()
+            st.rerun()
+    with col_btn2:
+        if st.button("📊 Ver períodos disponibles"):
+            from utils import list_available_periods
+            periodos = list_available_periods()
+            st.write("Períodos procesados:", periodos if periodos else "Ninguno aún")
 
     st.divider()
-    st.caption("Pipeline MEF Subnational Efficiency · Powered by Claude Code + MCP · Datos: datosabiertos.gob.pe")
+    st.caption("Pipeline MEF Subnational Efficiency · Powered by Claude Code + MCP · "
+               "Datos: datosabiertos.mef.gob.pe · OCR: PaddleOCR/EasyOCR")

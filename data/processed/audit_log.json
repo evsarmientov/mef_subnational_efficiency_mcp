@@ -1,0 +1,11 @@
+[
+  {
+    "timestamp": "2026-06-10T06:18:20.728530+00:00",
+    "action": "evaluator_run",
+    "periodo": "2025-09",
+    "errors": 0,
+    "warnings": 0,
+    "tiempo_evaluacion_seg": 1.0,
+    "veredicto": "OK"
+  }
+]
