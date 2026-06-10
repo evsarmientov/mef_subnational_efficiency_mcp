@@ -1,0 +1,19 @@
+{
+  "periodo": "2025-06",
+  "meses_acumulados": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "pim_nacional": 185406255595.34998,
+  "devengado_nacional": 113527010300.41,
+  "avance_nacional_pct": 61.23,
+  "saldo_no_devengado_nacional": 71879245295.0,
+  "n_regiones": 25,
+  "n_ejecutoras_hall_of_shame": 300,
+  "tiempo_ejecucion_seg": 55.0,
+  "nota": "Acumulado enero–mes indicado. PIM = MONTO_COMPROMETIDO_ANUAL del CSV MEF."
+}

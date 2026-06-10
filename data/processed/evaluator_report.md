@@ -1,11 +1,11 @@
-# Evaluator Agent Report — Período 2025-09
-_Generado: 2026-06-10 06:18 UTC_
+# Evaluator Agent Report — Período 2025-08
+_Generado: 2026-06-10 15:52 UTC_
 
 ## 1. Archivos Generados
 
-- ✅ `kpis_2025_09.json` — 0.5 KB
-- ✅ `region_2025_09.parquet` — 7.0 KB
-- ✅ `shame_2025_09.parquet` — 23.0 KB
+- ✅ `kpis_2025_08.json` — 0.5 KB
+- ✅ `region_2025_08.parquet` — 7.0 KB
+- ✅ `shame_2025_08.parquet` — 22.9 KB
 - ✅ `ocr_1964_results.json` — 3892.9 KB
 
 ## 2. Bugs Encontrados
@@ -25,16 +25,16 @@ _Generado: 2026-06-10 06:18 UTC_
 
 ## 5. Verificación de Integridad de Datos
 
-- **Período analizado:** 2025-09 (meses acumulados: [1, 2, 3, 4, 5, 6, 7, 8, 9])
-- **PIM Nacional:** S/ 221,312,147,216
-- **Devengado Nacional:** S/ 179,872,947,410
-- **Avance Nacional:** 81.3%
+- **Período analizado:** 2025-08 (meses acumulados: [1, 2, 3, 4, 5, 6, 7, 8])
+- **PIM Nacional:** S/ 208,997,588,536
+- **Devengado Nacional:** S/ 158,710,059,641
+- **Avance Nacional:** 75.9%
 - **Regiones cubiertas:** 25
 - **Ejecutoras en Hall of Shame:** 300
 
 ## 6. Benchmarks de Rendimiento
 
-- **Tiempo de ejecución del pipeline:** 45.3s
+- **Tiempo de ejecución del pipeline:** 59.3s
 - **Fuente de datos:** CSV local de 10.5 GB procesado con DuckDB
 - **Estrategia anti-context-flooding:** DuckDB lee el CSV directamente en disco sin cargarlo en memoria del LLM.
 

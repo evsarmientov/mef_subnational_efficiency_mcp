@@ -7,5 +7,77 @@
     "warnings": 0,
     "tiempo_evaluacion_seg": 1.0,
     "veredicto": "OK"
+  },
+  {
+    "timestamp": "2026-06-10T15:43:27.528154+00:00",
+    "action": "evaluator_run",
+    "periodo": "2025-12",
+    "errors": 0,
+    "warnings": 0,
+    "tiempo_evaluacion_seg": 0.3,
+    "veredicto": "OK"
+  },
+  {
+    "timestamp": "2026-06-10T15:46:55.495384+00:00",
+    "action": "evaluator_run",
+    "periodo": "2025-02",
+    "errors": 0,
+    "warnings": 0,
+    "tiempo_evaluacion_seg": 0.3,
+    "veredicto": "OK"
+  },
+  {
+    "timestamp": "2026-06-10T15:47:47.605420+00:00",
+    "action": "evaluator_run",
+    "periodo": "2025-03",
+    "errors": 0,
+    "warnings": 0,
+    "tiempo_evaluacion_seg": 0.2,
+    "veredicto": "OK"
+  },
+  {
+    "timestamp": "2026-06-10T15:48:40.911049+00:00",
+    "action": "evaluator_run",
+    "periodo": "2025-04",
+    "errors": 0,
+    "warnings": 0,
+    "tiempo_evaluacion_seg": 0.2,
+    "veredicto": "OK"
+  },
+  {
+    "timestamp": "2026-06-10T15:49:34.463251+00:00",
+    "action": "evaluator_run",
+    "periodo": "2025-05",
+    "errors": 0,
+    "warnings": 0,
+    "tiempo_evaluacion_seg": 0.2,
+    "veredicto": "OK"
+  },
+  {
+    "timestamp": "2026-06-10T15:50:29.803881+00:00",
+    "action": "evaluator_run",
+    "periodo": "2025-06",
+    "errors": 0,
+    "warnings": 0,
+    "tiempo_evaluacion_seg": 0.3,
+    "veredicto": "OK"
+  },
+  {
+    "timestamp": "2026-06-10T15:51:22.718523+00:00",
+    "action": "evaluator_run",
+    "periodo": "2025-07",
+    "errors": 0,
+    "warnings": 0,
+    "tiempo_evaluacion_seg": 0.2,
+    "veredicto": "OK"
+  },
+  {
+    "timestamp": "2026-06-10T15:52:22.330610+00:00",
+    "action": "evaluator_run",
+    "periodo": "2025-08",
+    "errors": 0,
+    "warnings": 0,
+    "tiempo_evaluacion_seg": 0.3,
+    "veredicto": "OK"
   }
 ]

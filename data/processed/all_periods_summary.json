@@ -1,0 +1,62 @@
+{
+  "resultados": [
+    {
+      "periodo": "2025-01",
+      "status": "skip"
+    },
+    {
+      "periodo": "2025-02",
+      "status": "ok",
+      "avance_pct": 28.2,
+      "tiempo_seg": 50.2,
+      "errores_evaluator": 0
+    },
+    {
+      "periodo": "2025-03",
+      "status": "ok",
+      "avance_pct": 37.35,
+      "tiempo_seg": 51.9,
+      "errores_evaluator": 0
+    },
+    {
+      "periodo": "2025-04",
+      "status": "ok",
+      "avance_pct": 45.15,
+      "tiempo_seg": 53.0,
+      "errores_evaluator": 0
+    },
+    {
+      "periodo": "2025-05",
+      "status": "ok",
+      "avance_pct": 52.81,
+      "tiempo_seg": 53.3,
+      "errores_evaluator": 0
+    },
+    {
+      "periodo": "2025-06",
+      "status": "ok",
+      "avance_pct": 61.23,
+      "tiempo_seg": 55.0,
+      "errores_evaluator": 0
+    },
+    {
+      "periodo": "2025-07",
+      "status": "ok",
+      "avance_pct": 67.87,
+      "tiempo_seg": 52.7,
+      "errores_evaluator": 0
+    },
+    {
+      "periodo": "2025-08",
+      "status": "ok",
+      "avance_pct": 75.94,
+      "tiempo_seg": 59.3,
+      "errores_evaluator": 0
+    },
+    {
+      "periodo": "2025-09",
+      "status": "skip"
+    }
+  ],
+  "tiempo_total_seg": 377.3
+}
