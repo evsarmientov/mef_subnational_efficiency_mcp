@@ -79,5 +79,23 @@
     "warnings": 0,
     "tiempo_evaluacion_seg": 0.3,
     "veredicto": "OK"
+  },
+  {
+    "timestamp": "2026-06-10T16:46:45.249302+00:00",
+    "action": "evaluator_run",
+    "periodo": "2025-10",
+    "errors": 0,
+    "warnings": 0,
+    "tiempo_evaluacion_seg": 0.7,
+    "veredicto": "OK"
+  },
+  {
+    "timestamp": "2026-06-10T16:47:40.515644+00:00",
+    "action": "evaluator_run",
+    "periodo": "2025-11",
+    "errors": 0,
+    "warnings": 0,
+    "tiempo_evaluacion_seg": 0.3,
+    "veredicto": "OK"
   }
 ]

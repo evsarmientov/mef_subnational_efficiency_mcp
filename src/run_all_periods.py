@@ -97,8 +97,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--meses", nargs="+", type=int,
-        default=list(range(1, 10)),  # enero–septiembre (meses con datos en el CSV)
-        help="Lista de meses a procesar (default: 1-9)"
+        default=list(range(1, 13)),  # enero–diciembre
+        help="Lista de meses a procesar (default: 1-12)"
     )
     args = parser.parse_args()
     main(args.meses)
