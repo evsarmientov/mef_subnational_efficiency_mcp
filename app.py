@@ -2,6 +2,7 @@
 MEF Subnational Efficiency Dashboard
 4-tab Streamlit application — Fiscal Year 2025 + Historical 1964 Track
 """
+APP_VERSION = "1.1.0"
 import json
 import sys
 from pathlib import Path
