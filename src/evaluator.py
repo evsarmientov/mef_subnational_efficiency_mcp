@@ -17,6 +17,7 @@ import pandas as pd
 DATA_DIR    = Path(__file__).parent.parent / "data"
 PROCESSED   = DATA_DIR / "processed"
 SNAPSHOTS   = DATA_DIR / "snapshots"
+EVALUATOR_VERSION = "1.1.0"
 
 
 # ── Validaciones ──────────────────────────────────────────────────────────────
