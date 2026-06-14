@@ -29,6 +29,7 @@ PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 
 MIN_PIM_SOLES = 10_000_000
+PIPELINE_VERSION = "1.1.0"
 
 
 def _periodo_to_filter(periodo: str) -> tuple[str, list[int]]:
