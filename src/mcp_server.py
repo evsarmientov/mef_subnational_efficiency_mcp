@@ -19,6 +19,8 @@ from mcp.types import TextContent, Tool
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
+SERVER_VERSION = "1.1.0"
+
 # Portal MEF de Datos Abiertos
 MEF_PORTAL = "https://datosabiertos.mef.gob.pe"
 MEF_API = "https://api.datosabiertos.mef.gob.pe/DatosAbiertos/v1"
@@ -203,6 +205,15 @@ async def list_tools() -> list[Tool]:
                 "required": [],
             },
         ),
+        Tool(
+            name="health_check",
+            description="Verifica conectividad con el backend MEF y retorna la versión del servidor.",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": [],
+            },
+        ),
     ]
 
 
@@ -257,6 +268,9 @@ async def _dispatch(name: str, args: dict) -> Any:
 
     if name == "listar_categorias_tematicas":
         return _listar_categorias_tematicas()
+
+    if name == "health_check":
+        return _health_check()
 
     raise ValueError(f"Herramienta desconocida: {name}")
 
@@ -423,6 +437,22 @@ def _obtener_ultimas_actualizaciones(limite: int) -> dict:
         }
         for a in activities[:limite]
     ]
+
+
+def _health_check() -> dict:
+    try:
+        with httpx.Client(timeout=10, verify=False) as client:
+            resp = client.get(f"{MEF_API}/datastore_search",
+                              params={"resource_id": RESOURCE_2025_GASTO_MENSUAL, "limit": 1, "callback": "cb"})
+            backend_ok = resp.status_code == 200
+    except Exception as e:
+        backend_ok = False
+    return {
+        "server_version": SERVER_VERSION,
+        "backend_mef": "ok" if backend_ok else "unreachable",
+        "api_url": MEF_API,
+        "resource_id": RESOURCE_2025_GASTO_MENSUAL,
+    }
 
 
 def _listar_categorias_tematicas() -> dict:
