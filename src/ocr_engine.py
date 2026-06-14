@@ -18,6 +18,10 @@ DATA_DIR = Path(__file__).parent.parent / "data"
 PROCESSED_DIR = DATA_DIR / "processed"
 PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 
+# Páginas por defecto (máximo 15, instrucción del docente)
+OCR_DEFAULT_PAGES = [43, 44, 45, 47, 48, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64]
+OCR_MAX_PAGES = 15
+
 
 def pdf_page_to_image(pdf_path: str, page_idx: int, dpi: int = 200) -> np.ndarray:
     doc = fitz.open(pdf_path)
